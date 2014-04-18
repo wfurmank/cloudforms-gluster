@@ -24,8 +24,12 @@ Things which needs to be ready in advance:
      root@cfme3# ssh-copy-id rhs1.example.com
 
 Project consists of 4 services:
+
 1. List Gluster Storage (methods lgs_*)
+
 2. Create Gluster Volume (methods cgv_*)
+
 3. Extend Gluster Volume (methods egv_*)
+
 4. Delete Glusater Volume (methods dgv_*)
 
