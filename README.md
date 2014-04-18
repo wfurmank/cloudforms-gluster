@@ -4,8 +4,10 @@ cloudforms-gluster
 Red Hat CloudForms and Storage Integration
 
 Things which needs to be ready in advance:
+
 1. Gluster Storage systems with management console. Management console details must be put info 
-   gluster_systems.txt file on cloudforms appliance.
+   /var/www/miq/vmdb/gluster_systems.txt file on cloudforms appliance.
+
    example:
      root@cfme3# cat /var/www/miq/vmdb/gluster_systems.txt
      # Gluster storage systems definition file for Storage Service integration 
