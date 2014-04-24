@@ -6,6 +6,7 @@ $evm.log("info", "egv_error Automate Method Started ***************************"
 #            Method Code Goes here
 #
 
+@debug = true
 
 miq_server = $evm.root['miq_server']
 user = $evm.root['user']
@@ -27,8 +28,8 @@ body += message
 body += "<br>\n<br>\n<br>-----\n"
 body += "<br>#{miq_server.hostname} CloudForms Management Engine\n<br>\n"
 
-# Logging email body
-$evm.log("info","\n\n==== user email body ====>#{body}<===\n")
+# Debug
+$evm.log("info","\n\n==== user email body ====>#{body}<===\n") if @debug
 
 # Sending user email
 $evm.execute(:send_email,to,from,subject,body,content_type = nil)
@@ -41,8 +42,8 @@ unless user.userid == "admin"
   body_admin += "<br>\n<br>The following message was sent to user: #{user.name} (#{user.userid})\n<br>\n"
   body_admin += body
 
-  # Logging admin email body
-  $evm.log("info","\n\n==== admin email body ====>#{body_admin}<===\n")
+  # Debug
+  $evm.log("info","\n\n==== admin email body ====>#{body_admin}<===\n") if @debug
 
   # Sending admin email
   $evm.execute(:send_email,to_admin,from,subject_admin,body_admin,content_type = nil)
