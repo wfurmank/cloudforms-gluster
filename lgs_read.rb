@@ -6,6 +6,7 @@ $evm.log("info", "lgs_read Automate Method Started ****************************"
 #            Method Code Goes here
 #
 
+@debug = true
 
 gluster_systems = $evm.object['gluster_systems']
 user = $evm.root['user']
@@ -36,11 +37,11 @@ for line in consoles.each_line
   `wget -O #{cert} http://#{console}/ca.crt 2>/dev/null`
 
   # Preparing curl syntax
-  curl = "curl -u #{cred} --cacert #{cert} https://#{console}"
+  curl = "curl 2> /dev/null -u #{cred} --cacert #{cert} https://#{console}"
     
   # Looking for cluster id of "gluster type" managed clusters
   clids = ""
-  for line in `#{curl}/api/clusters 2>/dev/null`.each_line
+  for line in `#{curl}/api/clusters`.each_line
     clid = line.split('"')[3..3].join if line.include? "<cluster href"
     clids += clid if line.include? "<gluster_service>true<"
   end
@@ -49,7 +50,7 @@ for line in consoles.each_line
     clid.chomp!
     # looking for Cluster Name for given Cluster ID
     found = false
-    for line in `#{curl}/api/clusters 2>/dev/null`.each_line
+    for line in `#{curl}/api/clusters`.each_line
       found = true if line.include? clid
       if found and line.include? "<name>"
         clname = line.gsub(/<\/*name>/,"").strip
@@ -61,7 +62,7 @@ for line in consoles.each_line
     message += "<br>Gluster-Console: #{console}, Cluster: #{clname}\n"
 
     # Looking for user's volumes in each cluster
-    volumes = `#{curl}/api/clusters/#{clid}/glustervolumes 2>/dev/null`
+    volumes = `#{curl}/api/clusters/#{clid}/glustervolumes`
     for line in volumes.each_line
       if user.userid == "admin"
         volume_list += "<br>#{console} / #{clname} / #{line.gsub(/<\/*name>/,"").strip}\n" if line.include? "<name>"
@@ -71,11 +72,11 @@ for line in consoles.each_line
     end
     
     # Debug
-    $evm.log("info","\n\nmessage =====>#{message}<===\n")
-    # Debug
+    $evm.log("info","\n\nmessage =====>\n#{message}<===\n") if @debug
+    
     
     # Looking for hosts' IP addresses in each "gluster type" cluster
-    hosts = `#{curl}/api/hosts 2>/dev/null | grep -e '<address>' -e "#{clid}" | grep -B1 "#{clid}" | grep '<address>' | sed -e 's:.*<address>::g' -e 's:</address>.*::g'`
+    hosts = `#{curl}/api/hosts | grep -e '<address>' -e "#{clid}" | grep -B1 "#{clid}" | grep '<address>' | sed -e 's:.*<address>::g' -e 's:</address>.*::g'`
       
     # Checking free space in each host
     if ! hosts.empty?
@@ -103,7 +104,10 @@ if volume_list.split.size > 1
   message += volume_list
 end
 
-$evm.log("info", "\n\n===== message body =======>#{message}<====\n")
+# Debug
+$evm.log("info", "\n\n===== message body =======>#{message}<====\n") if @debug
+
+# Passing message content
 $evm.object['message_body'] = message
 $evm.object['message_subject'] = "CloudForms: List Gluster Storage Request"
 
