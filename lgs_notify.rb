@@ -6,6 +6,8 @@ $evm.log("info", "lgs_notify Automate Method Started *************************")
 #            Method Code Goes here
 #
 
+@debug = true
+
 miq_server = $evm.root['miq_server']
 user = $evm.root['user']
 admin = $evm.vmdb('user').find_by_name("Administrator")
@@ -23,8 +25,8 @@ body += message
 body += "<br>\n<br>\n<br>-----\n"
 body += "<br>#{miq_server.hostname} CloudForms Management Engine\n<br>\n"
 
-# Logging email body
-$evm.log("info","\n\n==== user email body ====>#{body}<===\n")
+# Debug
+$evm.log("info","\n\n==== user email body ====>#{body}<===\n") if @debug
 
 # Sending user email
 $evm.execute(:send_email,to,from,subject,body,content_type = nil)
