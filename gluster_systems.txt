@@ -1,0 +1,10 @@
+# Gluster storage systems definition file for Storage Service integration 
+# There must be ssh key relationship working between CFME host all gluster
+# nodes: 
+#	root@cfme# ssh-copy-id node
+# Specify existing management console systems with gluster type clusters
+# Syntax: <FQDN of gluster console host> <user>@<domain>:<password>
+# Example: rhsc.example.com admin@internal:Pass123
+#
+rhsc.example.com admin@internal:redhat
+infra.example.com admin@internal:redhat
