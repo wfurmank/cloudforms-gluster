@@ -1,4 +1,6 @@
 # Gluster storage systems definition file for Storage Service integration 
+# The file is located at: /var/www/miq/vmdb/gluster_systems.txt
+#
 # There must be ssh key relationship working from CFME host to all gluster
 # nodes. Consider the following command: root@cfme# ssh-copy-id node
 #
