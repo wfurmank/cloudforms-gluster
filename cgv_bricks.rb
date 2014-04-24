@@ -1,126 +1,120 @@
 #
 #            Automate Method
 #
-$evm.log("info", "cgv_bricks Automate Method Started **************************")
+$evm.log("info", "lgs_read Automate Method Started ****************************")
 #
 #            Method Code Goes here
 #
 
+@debug = true
 
-console = $evm.object['dialog_cons']
-console = "rhsc.example.com" if console.nil?
-cluster = $evm.object['dialog_cluster']
-cluster = "RHS21-CL" if cluster.nil?
-name = $evm.object['dialog_name']
-name = "music" if name.nil?
-type = $evm.object['dialog_type']
-type = "distributed_replicate" if type.nil?
-size = $evm.object['dialog_size']
-size = "1000" if size.nil?
-gluster_systems = $evm.object['gluster_systems'].strip
-userid = $evm.root['user'].userid
+gluster_systems = $evm.object['gluster_systems']
+user = $evm.root['user']
+message = ""
 
-
-
-# Reading gluster console credentials from gluster_systems.txt file
+# Reading gluster consoles from gluster_systems.txt file
+consoles = ""
 for line in File.readlines(gluster_systems)
-  line.strip!
-  cred = line.split[1..1].join if line =~ /^#{console}/
+  line = line.gsub(/#.*/,"").strip
+  consoles += "#{line}\n" if line.split.size == 2
 end
 
-# Downloading certificate from each system to /tmp/<FQDN>.gluster.crt
-cert = "/tmp/#{console}.gluster.crt"
-`wget -O #{cert} http://#{console}/ca.crt 2>/dev/null`
+# Preparing list of user's volumes
+volume_list = "<br>Gluster-Console / Cluster / Volume\n"
 
+# Reading host details from each gluster console
+for line in consoles.each_line
+  line = line.gsub(/#.*/,"").strip
+  if line.split.size == 2
+    # Reading host FQDN ie: rhsc.example.com
+    console = line.split[0..0].join
+    # Reading credentials ie: admin@internal:redhat
+    cred = line.split[1..1].join
+  end
+  
+  # Downloading certificate from each system to /tmp/<FQDN>.gluster.crt
+  cert = "/tmp/#{console}.gluster.crt"
+  `wget -O #{cert} http://#{console}/ca.crt 2>/dev/null`
 
-# Preparing curl syntax
-curl = "curl -u #{cred} --cacert #{cert} https://#{console}"
+  # Preparing curl syntax
+  curl = "curl 2> /dev/null -u #{cred} --cacert #{cert} https://#{console}"
+    
+  # Looking for cluster id of "gluster type" managed clusters
+  clids = ""
+  for line in `#{curl}/api/clusters`.each_line
+    clid = line.split('"')[3..3].join if line.include? "<cluster href"
+    clids += clid if line.include? "<gluster_service>true<"
+  end
+  
+  for clid in clids.each_line
+    clid.chomp!
+    # looking for Cluster Name for given Cluster ID
+    found = false
+    for line in `#{curl}/api/clusters`.each_line
+      found = true if line.include? clid
+      if found and line.include? "<name>"
+        clname = line.gsub(/<\/*name>/,"").strip
+        break
+      end
+    end
 
-# Looking for cluster id by name
-for line in `#{curl}/api/clusters 2> /dev/null`.each_line 
-  found = false
-  clid = line.split('"')[3..3].join if line.include? "<cluster href="
-  if line.include? "<name>#{cluster}<"
-    found = true
-    break
+    # Message header
+    message += "<br>Gluster-Console: #{console}, Cluster: #{clname}\n"
+
+    # Looking for user's volumes in each cluster
+    volumes = `#{curl}/api/clusters/#{clid}/glustervolumes`
+    for line in volumes.each_line
+      if user.userid == "admin"
+        volume_list += "<br>#{console} / #{clname} / #{line.gsub(/<\/*name>/,"").strip}\n" if line.include? "<name>"
+      else
+        volume_list += "<br>#{console} / #{clname} / #{line.gsub(/<\/*name>/,"").strip}\n" if line.include? "<name>#{user.userid}_"
+      end
+    end
+    
+    # Debug
+    $evm.log("info","\n\nmessage =====>\n#{message}<===\n") if @debug
+    
+    
+    # Looking for hosts' IP addresses in each "gluster type" cluster
+    hosts = `#{curl}/api/hosts | grep -e '<address>' -e "#{clid}" | grep -B1 "#{clid}" | grep '<address>' | sed -e 's:.*<address>::g' -e 's:</address>.*::g'`
+      
+    # Checking free space in each host
+    if ! hosts.empty?
+      message += "<br>Host-IP / VG / Free-Space\n"
+      for host in hosts.each_line do
+        host.chomp!
+        ssh_err = `ssh -o "ConnectTimeout 1" #{host} ls /etc/services 2>/dev/null >/dev/null || echo $?`
+        if ssh_err.empty?
+          message += `ssh #{host} vgs 2> /dev/null | grep -v Free | awk '{print $1,"/",$NF}' | xargs -l echo "<br>#{host} / "`
+        else
+          err = "Error: CFME is not able to run remote commands over ssh at host #{host}"
+          $evm.log("error",err)
+          message += err
+          subject = "CloudForms: List Gluster Storage Request Error"
+          exit = MIQ_ERROR
+        end
+      end
+    end
+    message += "<br>\n"
   end
 end
 
-unless found
-  $evm.log("error","No cluster id found for name #{cluster}")  
-  exit MIQ_ERROR
-end
-
-
-
-# Looking for clid's hosts
-hosts = ""
-for line in `#{curl}/api/hosts 2> /dev/null`.each_line 
-  hostip = line.gsub(/<\/*address>/,"") if line.include? "<address>"
-  if line.include? "#{clid}"
-    hosts += hostip
-  end
-end
-
-unless hosts.lines.count > 1
-  $evm.log("error","Unable to find hosts for cluster #{cluster}")
-  exit MIQ_ERROR
+if volume_list.split.size > 1
+  message += "<br>Your existing gluster volumes:\n<br>\n"
+  message += volume_list
 end
 
 # Debug
-$evm.log("info","\n\n======= debug ====>>>>> #{hosts}\n")
+$evm.log("info", "\n\n===== message body =======>#{message}<====\n") if @debug
 
-# hosts = `#{curl}/api/hosts 2>/dev/null | grep -e '<address>' -e "#{clid}" | grep -B1 "#{clid}" | grep '<address>' | sed -e 's:.*<address>::g' -e 's:</address>.*::g'`
+# Passing message content
+$evm.object['message_body'] = message
+$evm.object['message_subject'] = "CloudForms: List Gluster Storage Request"
 
-# Now its decission time how many bricks we need. One brick per host is enough unless we need replica and there is less than 4. So if there are less that 4 hosts lets make twice as many bricks.
-hosts += hosts if hosts.lines.count < 4 and type.include? "repl"
 
-# Calculating brick size (lvsize) in MB. If the volume is not replicated it's just size/number of bricks. For repicated volumes double space is needed.
-if type.include? "repl"
-  space = size.to_i * 2
-else
-  space = size.to_i
-end
-lvsize = space / hosts.lines.count
-#/ wt...???
-
-# Creating logical volumes in the biggest available volume group on each host
-n = 0
-bricks = ""
-for host in hosts.each_line
-  host.strip!
-  # Generating lvname
-  n += 1
-  lvname = "#{userid}_#{name}_#{n.to_s}"
-
-  # Checking volume group name
-  vg = `ssh #{host} vgs | awk '{print $NF,$1}' | sed -e 's/\.[0-9][0-9]g/000/g' -e 's/\.[0-9][0-9]t/000000/g' | sort -g | tail -1 | cut -d' ' -f2`.chomp
-
-  # Creating xfs bricks 
-  ssh = "ssh #{host}"
-  `#{ssh} mkdir /#{lvname} 2>/dev/null`
-  `#{ssh} lvcreate -n #{lvname} -L #{lvsize} #{vg} 2>/dev/null`
-  `#{ssh} mkfs.xfs /dev/#{vg}/#{lvname} 2>/dev/null`
-  `#{ssh} mount /dev/#{vg}/#{lvname} /#{lvname} 2>/dev/null`
-  `#{ssh} mkdir /#{lvname}/brick 2>/dev/null`
-  `#{ssh} "grep -q " /#{lvname} " /etc/fstab || echo /dev/#{vg}/#{lvname} /#{lvname} xfs defaults 0 0 >> /etc/fstab"`
-  bricks += "#{host} /#{lvname}/brick\n"
-
-  df = `#{ssh} df -H | grep -e Filesystem -e "[-/]#{userid}_#{name}_"`
-  $evm.log("info","\n\n#{host}: ======= debug ====>>>>\n#{df}\n")
-  
-  unless df.lines.count > 1
-    $evm.log("error","Failed to create bricks.")
-    exit MIQ_ERROR
-  end
-  
-end
-
-$evm.object['bricks'] = bricks
-  
 
 #
 #
 #
-$evm.log("info", "Automate Method Ended")
+$evm.log("info", "lgs_read Automate Method Ended")
 exit MIQ_OK
