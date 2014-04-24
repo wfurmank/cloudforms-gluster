@@ -6,7 +6,7 @@ $evm.log("info", "cgv_error Automate Method Started ***************************"
 #            Method Code Goes here
 #
 
-@debug
+@debug = true
 
 miq_server = $evm.root['miq_server']
 user = $evm.root['user']
