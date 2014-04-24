@@ -11,6 +11,8 @@ $evm.log("info", "gdv_error Automate Method Started ***************************"
 miq_server = $evm.root['miq_server']
 user = $evm.root['user']
 admin = $evm.vmdb('user').find_by_name("Administrator")
+message = $evm.object['message_body']
+subject = $evm.object['message_subject']
 from = $evm.object['from']
 to = user.email
 to_admin = admin.email
