@@ -5,21 +5,14 @@ $evm.log("info", "egv_bricks Automate Method Started **************************"
 #
 #            Method Code Goes here
 #
+
 @debug = true
 
 console = $evm.object['dialog_cons']
-console = "rhsc.example.com" if console.nil?
 cluster = $evm.object['dialog_cluster']
-cluster = "default" if cluster.nil?
 name = $evm.object['dialog_name']
-name = "admin_auth2" if name.nil?
-#type = $evm.object['dialog_type']
-#type = "distributed_replicate" if type.nil?
 size = $evm.object['dialog_size']
-size = "1000" if size.nil?
 gluster_systems = $evm.object['gluster_systems'].strip
-#userid = $evm.root['user'].userid
-
 
 
 # Reading gluster console credentials from gluster_systems.txt file
@@ -33,10 +26,10 @@ cert = "/tmp/#{console}.gluster.crt"
 `wget -O #{cert} http://#{console}/ca.crt 2>/dev/null`
 
 # Preparing curl syntax
-curl = "curl -u #{cred} --cacert #{cert} https://#{console}"
+curl = "curl 2> /dev/null -u #{cred} --cacert #{cert} https://#{console}"
 
 # Looking for cluster id by name
-for line in `#{curl}/api/clusters 2> /dev/null`.each_line 
+for line in `#{curl}/api/clusters`.each_line 
   found = false
   clid = line.split('"')[3..3].join if line.include? "<cluster href="
   if line.include? "<name>#{cluster}<"
@@ -52,7 +45,7 @@ end
 
 # Looking for clid's hosts
 hosts = ""
-for line in `#{curl}/api/hosts 2> /dev/null`.each_line 
+for line in `#{curl}/api/hosts`.each_line 
   hostip = line.gsub(/<\/*address>/,"") if line.include? "<address>"
   if line.include? "#{clid}"
     hosts += hostip
@@ -68,7 +61,7 @@ unless hosts.lines.count > 1
 end
 
 # Looking for volume id by name
-for line in `#{curl}/api/clusters/#{clid}/glustervolumes 2> /dev/null`.each_line 
+for line in `#{curl}/api/clusters/#{clid}/glustervolumes`.each_line 
   found = false
   volid = line.split('"')[3..3].join if line.include? "<gluster_volume href="
   if line.include? "<name>#{name}<"
@@ -83,7 +76,7 @@ unless found
 end
 
 # Checking number of replicas
-for line in `#{curl}/api/clusters/#{clid}/glustervolumes/#{volid} 2> /dev/null`.each_line 
+for line in `#{curl}/api/clusters/#{clid}/glustervolumes/#{volid}`.each_line 
   repl = line.split('>')[1..1].join.split('<')[0..0].join if line.include? "<replica_count>"
 end
 
@@ -101,7 +94,7 @@ lvsize = space / hosts.lines.count
 
 # Calculates next brick number
 n = 0
-for line in `#{curl}/api/clusters/#{clid}/glustervolumes/#{volid}/bricks 2> /dev/null`.each_line 
+for line in `#{curl}/api/clusters/#{clid}/glustervolumes/#{volid}/bricks`.each_line 
   n += 1 if line.include? "<brick href="
 end
   
