@@ -24,12 +24,11 @@ end
 cert = "/tmp/#{console}.gluster.crt"
 `wget -O #{cert} http://#{console}/ca.crt 2>/dev/null`
 
-
 # Preparing curl syntax
-curl = "curl -u #{cred} --cacert #{cert} https://#{console}"
+curl = "curl 2> /dev/null -u #{cred} --cacert #{cert} https://#{console}"
 
 # Looking for cluster id by name
-for line in `#{curl}/api/clusters 2> /dev/null`.each_line 
+for line in `#{curl}/api/clusters`.each_line 
   found = false
   clid = line.split('"')[3..3].join if line.include? "<cluster href="
   if line.include? "<name>#{cluster}<"
@@ -43,10 +42,9 @@ unless found
   exit MIQ_ERROR
 end
 
-
-# Looking for clid's hosts
+# Looking for hosts by cluser id
 hosts = ""
-for line in `#{curl}/api/hosts 2> /dev/null`.each_line 
+for line in `#{curl}/api/hosts`.each_line 
   hostip = line.gsub(/<\/*address>/,"") if line.include? "<address>"
   if line.include? "#{clid}"
     hosts += hostip
@@ -59,8 +57,6 @@ unless hosts.lines.count > 1
 end
 
 # Cleaning up
-
-
 for host in hosts.each_line
   host.strip!
   cleanup  = `ssh #{host} umount /#{name}_* 2>&1`
